@@ -10,37 +10,31 @@ def recommend_game(title, category, genre):
     df = df.loc[df['steam_appid'] != 2639280]
     df.drop(columns = ['steam_appid','lang','name_translated', 'dev_translated', 'pub_translated', 'n_achievements','review_score','review_score_desc', 'positive_percentual','metacritic', 'is_free', ], inplace = True)
 
-    #Search with all 3
-    if title!='' and category!='None' and genre!='None':
-        df['similarity'] = df['name'].apply(lambda x: fuzz.token_sort_ratio(title, x))
-        return df.loc[(df['categories'].str.contains(category.lower(), case=False)) & (df['genres'].str.contains(genre.lower(), case=False))].sort_values(by = 'similarity', ascending=False)[:10]
+    # No Input case 
+    if title == '' and category == ['None'] and genre == ['None']:
+        return None 
+
     
-    #Search with only 2 parameters
-    if title!='' and category!='None' and genre=='None':
+    # if we get title we intialize fuzzy searching 
+    if title:
         df['similarity'] = df['name'].apply(lambda x: fuzz.token_sort_ratio(title, x))
-        return df.loc[df['categories'].str.contains(category.lower(), case=False)].sort_values(by = 'similarity', ascending=False)[:10]
-    
-    if title!='' and category=='None' and genre!='None':
-        df['similarity'] = df['name'].apply(lambda x: fuzz.token_sort_ratio(title, x))
-        return df.loc[df['genres'].str.contains(genre.lower(), case=False)].sort_values(by = 'similarity', ascending=False)[:10]
 
-    if title=='' and category!='None' and genre!='None':
-        return df.loc[(df['categories'].str.contains(category.lower(), case=False)) & (df['genres'].str.contains(genre.lower(), case=False))]
-    
-    #Search with only a single parameter
-    #Search with only title
-    if title !='':
-        df['similarity'] = df['name'].apply(lambda x: fuzz.token_sort_ratio(title, x))
-        return df.sort_values(by = 'similarity', ascending=False)[:10]
+    # Create filter conditions dynamically
+    conditions = []
 
-    #If only category is provided
-    if category != 'None':
-        return df.loc[df['categories'].str.contains(category.lower(), case=False)]
+    if category and 'None' not in category:
+        conditions.append(df['categories'].str.contains('|'.join([c.lower() for c in category]), case=False))
 
-    #If only genre is provided
-    if genre != 'None':
-        return df.loc[df['genres'].str.contains(genre.lower(), case=False)]
+    if genre and 'None' not in genre:
+        conditions.append(df['genres'].str.contains('|'.join([g.lower() for g in genre]), case=False))
 
-    #Return None if user does not enter anything
-    if title == '' and category =='None' and genre == 'None':
-        return None
+    # Apply all conditions
+    if conditions:
+        df = df.loc[pd.concat(conditions, axis=1).all(axis=1)]
+
+    # Sort if title similarity is used
+    if title:
+        df = df.sort_values(by='similarity', ascending=False)
+
+    return df if not df.empty else None
+
